@@ -21,3 +21,10 @@
 /src.ruby/mpxj/Gemfile.lock
 /src.ruby/mpxj/.yardoc
 /src.ruby/mpxj/lib/mpxj/*.jar
+
+# intellij idea
+/.idea/
+/out/
+/classes/
+/classes.test/
+*.iml
