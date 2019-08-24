@@ -380,6 +380,36 @@ final class Var2Data extends MPPComponent
    }
 
    /**
+    * This method retrieves a long integer of the specified type,
+    * belonging to the item with the specified unique ID. Note that
+    * the long value is read from an arbitrary offset within the
+    * byte array of data.
+    *
+    * @param id unique ID of entity to which this data belongs
+    * @param offset offset into the byte array fom which to read the long integer
+    * @param type data type identifier
+    * @return required long integer data
+    */
+   public long getLong(Integer id, int offset, Integer type)
+   {
+      long result = 0;
+
+      Integer metaOffset = m_meta.getOffset(id, type);
+
+      if (metaOffset != null)
+      {
+         byte[] value = m_map.get(metaOffset);
+
+         if (value != null && value.length >= offset + 4)
+         {
+            result = MPPUtility.getLong(value, offset);
+         }
+      }
+
+      return (result);
+   }
+
+   /**
     * This method retrieves a double of the specified type,
     * belonging to the item with the specified unique ID.
     *
