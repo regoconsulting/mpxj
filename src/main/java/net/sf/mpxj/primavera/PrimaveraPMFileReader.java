@@ -61,19 +61,20 @@ import net.sf.mpxj.Duration;
 import net.sf.mpxj.EventManager;
 import net.sf.mpxj.FieldContainer;
 import net.sf.mpxj.FieldType;
+import net.sf.mpxj.FieldTypeClass;
 import net.sf.mpxj.MPXJException;
 import net.sf.mpxj.Priority;
 import net.sf.mpxj.ProjectCalendar;
 import net.sf.mpxj.ProjectCalendarException;
 import net.sf.mpxj.ProjectCalendarHours;
 import net.sf.mpxj.ProjectConfig;
-import net.sf.mpxj.ProjectEntityWithUniqueID;
 import net.sf.mpxj.ProjectFile;
 import net.sf.mpxj.ProjectProperties;
 import net.sf.mpxj.Relation;
 import net.sf.mpxj.RelationType;
 import net.sf.mpxj.Resource;
 import net.sf.mpxj.ResourceAssignment;
+import net.sf.mpxj.ResourceField;
 import net.sf.mpxj.Task;
 import net.sf.mpxj.TaskField;
 import net.sf.mpxj.TimeUnit;
@@ -81,7 +82,6 @@ import net.sf.mpxj.common.BooleanHelper;
 import net.sf.mpxj.common.DateHelper;
 import net.sf.mpxj.common.NumberHelper;
 import net.sf.mpxj.listener.ProjectListener;
-import net.sf.mpxj.mpp.CustomFieldValueItem;
 import net.sf.mpxj.primavera.schema.APIBusinessObjects;
 import net.sf.mpxj.primavera.schema.ActivityCodeType;
 import net.sf.mpxj.primavera.schema.ActivityCodeTypeType;
@@ -136,14 +136,17 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
          config.setAutoResourceUniqueID(false);
          config.setAutoCalendarUniqueID(false);
          config.setAutoAssignmentUniqueID(false);
-
+         config.setAutoWBS(false);
+         
          m_projectFile.getProjectProperties().setFileApplication("Primavera");
          m_projectFile.getProjectProperties().setFileType("PMXML");
 
          CustomFieldContainer fields = m_projectFile.getCustomFields();
-         fields.getCustomField(TaskField.TEXT1).setAlias("WBS Code");
-         fields.getCustomField(TaskField.TEXT2).setAlias("Task ID");
-
+         fields.getCustomField(TaskField.TEXT1).setAlias("Code");
+         fields.getCustomField(TaskField.TEXT2).setAlias("Activity Type");
+         fields.getCustomField(TaskField.TEXT3).setAlias("Status");
+         fields.getCustomField(TaskField.NUMBER1).setAlias("Primary Resource Unique ID");
+                  
          m_eventManager.addProjectListeners(m_projectListeners);
 
          SAXParserFactory factory = SAXParserFactory.newInstance();
@@ -228,22 +231,103 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
    }
 
    /**
-    * Set up CustomFieldValueItems as UDF object id -> UDFType title (alias).
-    *
-    * @param apibo PMXML data
-    * @author lsong
+    * Process UDF definitions.
+    * 
+    * @param apibo top level object
     */
    private void processProjectUDFs(APIBusinessObjects apibo)
    {
-      CustomFieldContainer customFields = m_projectFile.getCustomFields();
       for (UDFTypeType udf : apibo.getUDFType())
       {
-         CustomFieldValueItem item = new CustomFieldValueItem(udf.getObjectId());
-         item.setValue(udf.getTitle());
-         customFields.registerValue(item);
+         processUDF(udf);
       }
    }
 
+   /**
+    * Process an individual UDF.
+    * 
+    * @param udf UDF definition
+    */
+   private void processUDF(UDFTypeType udf)
+   {
+      FieldTypeClass fieldType = FIELD_TYPE_MAP.get(udf.getSubjectArea());
+      if (fieldType != null)
+      {
+         UserFieldDataType dataType = UserFieldDataType.getInstanceFromXmlName(udf.getDataType());
+         String name = udf.getTitle();
+         FieldType field = addUserDefinedField(fieldType, dataType, name);
+         if (field != null)
+         {
+            m_fieldTypeMap.put(udf.getObjectId(), field);
+         }
+      }
+   }
+   
+   /**
+    * Map the Primavera UDF to a custom field.
+    * 
+    * @param fieldType parent object type
+    * @param dataType UDF data type
+    * @param name UDF name
+    * @return FieldType instance
+    */
+   private FieldType addUserDefinedField(FieldTypeClass fieldType, UserFieldDataType dataType, String name)
+   {
+      FieldType field = null;
+      
+      try
+      {
+         switch (fieldType)
+         {
+            case TASK:
+            {
+               do
+               {
+                  field = m_taskUdfCounters.nextField(TaskField.class, dataType);
+               }
+               while (RESERVED_TASK_FIELDS.contains(field));
+
+               m_projectFile.getCustomFields().getCustomField(field).setAlias(name);
+
+               break;
+            }
+            
+            case RESOURCE:
+            {
+               field = m_resourceUdfCounters.nextField(ResourceField.class, dataType);
+               m_projectFile.getCustomFields().getCustomField(field).setAlias(name);
+               break;
+            }
+            
+            case ASSIGNMENT:
+            {
+               field = m_assignmentUdfCounters.nextField(AssignmentField.class, dataType);
+               m_projectFile.getCustomFields().getCustomField(field).setAlias(name);
+               break;
+            }
+            
+            default:
+            {
+               break;
+            }
+         }         
+      }
+
+      catch (Exception ex)
+      {
+         //
+         // SF#227: If we get an exception thrown here... it's likely that
+         // we've run out of user defined fields, for example
+         // there are only 30 TEXT fields. We'll ignore this: the user
+         // defined field won't be mapped to an alias, so we'll
+         // ignore it when we read in the values.
+         //
+      }
+      
+      return field;
+   }
+
+   
    /**
     * Process project properties.
     *
@@ -483,14 +567,15 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
          wbsTasks.add(task);
 
          task.setUniqueID(uniqueID);
+         task.setGUID(DatatypeConverter.parseUUID(row.getGUID()));
          task.setName(row.getName());
          task.setBaselineCost(row.getSummaryBaselineTotalCost());
-         task.setGUID(DatatypeConverter.parseUUID(row.getGUID()));
          task.setRemainingCost(row.getSummaryRemainingTotalCost());
          task.setRemainingDuration(getDuration(row.getSummaryRemainingDuration()));
+         task.setSummary(true);
          task.setStart(row.getAnticipatedStartDate());
          task.setFinish(row.getAnticipatedFinishDate());
-         task.setText(1, row.getCode());
+         task.setWBS(row.getCode());
       }
 
       //
@@ -509,6 +594,8 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
          {
             m_projectFile.getChildTasks().remove(task);
             parentTask.getChildTasks().add(task);
+            task.setWBS(parentTask.getWBS() + "." + task.getWBS());
+            task.setText(1, task.getWBS());
          }
       }
 
@@ -546,8 +633,8 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
 
          task.setUniqueID(uniqueID);
          task.setGUID(DatatypeConverter.parseUUID(row.getGUID()));
-         task.setPercentageComplete(reversePercentage(row.getPercentComplete()));
          task.setName(row.getName());
+         task.setPercentageComplete(reversePercentage(row.getPercentComplete()));
          task.setRemainingDuration(getDuration(row.getRemainingDuration()));
          task.setActualWork(getDuration(zeroIsNull(row.getActualDuration())));
          task.setRemainingWork(getDuration(row.getRemainingTotalUnits()));
@@ -559,9 +646,10 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
          task.setActualCost(NumberHelper.DOUBLE_ZERO);
          task.setRemainingCost(NumberHelper.DOUBLE_ZERO);
          task.setBaselineCost(NumberHelper.DOUBLE_ZERO);
-
          task.setConstraintDate(row.getPrimaryConstraintDate());
-         task.setConstraintType(CONSTRAINT_TYPE_MAP.get(row.getPrimaryConstraintType()));
+         task.setConstraintType(CONSTRAINT_TYPE_MAP.get(row.getPrimaryConstraintType()));         
+         task.setSecondaryConstraintDate(row.getSecondaryConstraintDate());
+         task.setSecondaryConstraintType(CONSTRAINT_TYPE_MAP.get(row.getSecondaryConstraintType()));
          task.setActualStart(row.getActualStartDate());
          task.setActualFinish(row.getActualFinishDate());
          task.setLateStart(row.getRemainingLateStartDate());
@@ -574,9 +662,17 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
          task.setPriority(PRIORITY_MAP.get(row.getLevelingPriority()));
          task.setCreateDate(row.getCreateDate());
          task.setText(1, row.getId());
-
+         task.setText(2, row.getType());
+         task.setText(3, row.getStatus());
+         task.setNumber(1, row.getPrimaryResourceObjectId());
+      
          task.setMilestone(BooleanHelper.getBoolean(MILESTONE_MAP.get(row.getType())));
          task.setCritical(task.getEarlyStart() != null && task.getLateStart() != null && !(task.getLateStart().compareTo(task.getEarlyStart()) > 0));
+
+         if (parentTask != null)
+         {
+            task.setWBS(parentTask.getWBS());
+         }
 
          Integer calId = row.getCalendarObjectId();
          ProjectCalendar cal = m_calMap.get(calId);
@@ -670,7 +766,7 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
     */
    private void updateDates(Task parentTask)
    {
-      if (parentTask.getSummary())
+      if (parentTask.hasChildTasks())
       {
          int finished = 0;
          Date actualStartDate = parentTask.getActualStart();
@@ -815,7 +911,6 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
    {
       task.setID(Integer.valueOf(id++));
       task.setOutlineLevel(outlineLevel);
-      task.setSummary(task.getChildTasks().size() != 0);
       outlineLevel = Integer.valueOf(outlineLevel.intValue() + 1);
       for (Task childTask : task.getChildTasks())
       {
@@ -950,21 +1045,69 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
    }
 
    /**
-    * Write user defined types to the PMXML file.
-    *
-    * @param mpxj parent object
-    * @param udfs user defined fields
-    * @author lsong
+    * Process UDFs for a specific object.
+    * 
+    * @param mpxj field container
+    * @param udfs UDF values
     */
-   private void readUDFTypes(ProjectEntityWithUniqueID mpxj, List<UDFAssignmentType> udfs)
+   private void readUDFTypes(FieldContainer mpxj, List<UDFAssignmentType> udfs)
    {
-      CustomFieldContainer customFields = m_projectFile.getCustomFields();
       for (UDFAssignmentType udf : udfs)
       {
-         customFields.registerAliasValue((String) customFields.getCustomFieldValueItemByUniqueID(udf.getTypeObjectId()).getValue(), mpxj.getUniqueID(), udf);
+         FieldType fieldType = m_fieldTypeMap.get(Integer.valueOf(udf.getTypeObjectId()));
+         if (fieldType != null)
+         {
+            mpxj.set(fieldType, getUdfValue(udf));
+         }
       }
    }
 
+   /**
+    * Retrieve the value of a UDF.
+    * 
+    * @param udf UDF value holder
+    * @return UDF value
+    */
+   private Object getUdfValue(UDFAssignmentType udf)
+   {
+      if (udf.getCostValue() != null)
+      {
+         return udf.getCostValue();
+      }
+      
+      if (udf.getDoubleValue() != null)
+      {
+         return udf.getDoubleValue();
+      }
+      
+      if (udf.getFinishDateValue() != null)
+      {
+         return udf.getFinishDateValue();
+      }
+      
+      if (udf.getIndicatorValue() != null)
+      {
+         return udf.getIndicatorValue();
+      }
+      
+      if (udf.getIntegerValue() != null)
+      {
+         return udf.getIntegerValue();
+      }
+      
+      if (udf.getStartDateValue() != null)
+      {
+         return udf.getStartDateValue();
+      }
+      
+      if (udf.getTextValue() != null)
+      {
+         return udf.getTextValue();
+      }
+      
+      return null;
+   }
+   
    /**
     * Read details of any activity codes assigned to this task.
     * @param task parent task
@@ -1036,14 +1179,18 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
    private Map<Integer, Integer> m_clashMap = new HashMap<Integer, Integer>();
    private Map<Integer, ProjectCalendar> m_calMap = new HashMap<Integer, ProjectCalendar>();
    private Map<Integer, ActivityCodeValue> m_activityCodeMap = new HashMap<Integer, ActivityCodeValue>();
-
+   private UserFieldCounters m_taskUdfCounters = new UserFieldCounters();
+   private UserFieldCounters m_resourceUdfCounters = new UserFieldCounters();
+   private UserFieldCounters m_assignmentUdfCounters = new UserFieldCounters();
+   private Map<Integer, FieldType> m_fieldTypeMap = new HashMap<Integer, FieldType>();
+   
    private static final Map<String, net.sf.mpxj.ResourceType> RESOURCE_TYPE_MAP = new HashMap<String, net.sf.mpxj.ResourceType>();
    static
    {
       RESOURCE_TYPE_MAP.put(null, net.sf.mpxj.ResourceType.WORK);
       RESOURCE_TYPE_MAP.put("Labor", net.sf.mpxj.ResourceType.WORK);
       RESOURCE_TYPE_MAP.put("Material", net.sf.mpxj.ResourceType.MATERIAL);
-      RESOURCE_TYPE_MAP.put("Nonlabor", net.sf.mpxj.ResourceType.MATERIAL);
+      RESOURCE_TYPE_MAP.put("Nonlabor", net.sf.mpxj.ResourceType.COST);
    }
 
    private static final Map<String, ConstraintType> CONSTRAINT_TYPE_MAP = new HashMap<String, ConstraintType>();
@@ -1056,8 +1203,8 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
       CONSTRAINT_TYPE_MAP.put("Finish On or Before", ConstraintType.FINISH_NO_LATER_THAN);
       CONSTRAINT_TYPE_MAP.put("Finish On or After", ConstraintType.FINISH_NO_EARLIER_THAN);
       CONSTRAINT_TYPE_MAP.put("As Late As Possible", ConstraintType.AS_LATE_AS_POSSIBLE);
-      CONSTRAINT_TYPE_MAP.put("Mandatory Start", ConstraintType.MUST_START_ON);
-      CONSTRAINT_TYPE_MAP.put("Mandatory Finish", ConstraintType.MUST_FINISH_ON);
+      CONSTRAINT_TYPE_MAP.put("Mandatory Start", ConstraintType.MANDATORY_START);
+      CONSTRAINT_TYPE_MAP.put("Mandatory Finish", ConstraintType.MANDATORY_FINISH);
    }
 
    private static final Map<String, Priority> PRIORITY_MAP = new HashMap<String, Priority>();
@@ -1112,5 +1259,22 @@ public final class PrimaveraPMFileReader extends AbstractProjectReader
       MILESTONE_MAP.put("WBS Summary", Boolean.FALSE);
    }
 
+   private static final Map<String, FieldTypeClass> FIELD_TYPE_MAP = new HashMap<String, FieldTypeClass>();
+   static
+   {
+      FIELD_TYPE_MAP.put("Activity", FieldTypeClass.TASK);
+      FIELD_TYPE_MAP.put("WBS", FieldTypeClass.TASK);
+      FIELD_TYPE_MAP.put("Resource", FieldTypeClass.RESOURCE);
+      FIELD_TYPE_MAP.put("Resource Assignment", FieldTypeClass.ASSIGNMENT);
+   }
+
+   private static final Set<TaskField> RESERVED_TASK_FIELDS = new HashSet<TaskField>();
+   static
+   {
+      RESERVED_TASK_FIELDS.add(TaskField.TEXT1);
+      RESERVED_TASK_FIELDS.add(TaskField.TEXT2);
+
+   }
+   
    private static final WbsRowComparatorPMXML WBS_ROW_COMPARATOR = new WbsRowComparatorPMXML();
 }

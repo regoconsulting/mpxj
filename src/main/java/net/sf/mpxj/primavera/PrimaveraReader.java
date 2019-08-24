@@ -654,6 +654,7 @@ final class PrimaveraReader
       {
          Task task = m_project.addTask();
          task.setProject(projectName); // P6 task always belongs to project
+         task.setSummary(true);
          processFields(m_wbsFields, row, task);
          populateUserDefinedFieldValues("PROJWBS", FieldTypeClass.TASK, task, task.getUniqueID());
          uniqueIDs.add(task.getUniqueID());
@@ -1024,7 +1025,6 @@ final class PrimaveraReader
    {
       task.setID(Integer.valueOf(id++));
       task.setOutlineLevel(outlineLevel);
-      task.setSummary(task.getChildTasks().size() != 0);
       outlineLevel = Integer.valueOf(outlineLevel.intValue() + 1);
       for (Task childTask : task.getChildTasks())
       {
@@ -1055,7 +1055,7 @@ final class PrimaveraReader
     */
    private void updateDates(Task parentTask)
    {
-      if (parentTask.getSummary())
+      if (parentTask.hasChildTasks())
       {
          int finished = 0;
          Date plannedStartDate = parentTask.getStart();
@@ -1179,7 +1179,7 @@ final class PrimaveraReader
     */
    private void updateWork(Task parentTask)
    {
-      if (parentTask.getSummary())
+      if (parentTask.hasChildTasks())
       {
          ProjectProperties properties = m_project.getProjectProperties();
 
@@ -1668,6 +1668,8 @@ final class PrimaveraReader
       map.put(TaskField.BASELINE_START, "target_start_date");
       map.put(TaskField.BASELINE_FINISH, "target_end_date");
       map.put(TaskField.CONSTRAINT_TYPE, "cstr_type");
+      map.put(TaskField.SECONDARY_CONSTRAINT_DATE, "cstr_date2");
+      map.put(TaskField.SECONDARY_CONSTRAINT_TYPE, "cstr_type2");
       map.put(TaskField.PRIORITY, "priority_type");
       map.put(TaskField.CREATED, "create_date");
       map.put(TaskField.TYPE, "duration_type");
@@ -1755,7 +1757,7 @@ final class PrimaveraReader
       RESOURCE_TYPE_MAP.put(null, ResourceType.WORK);
       RESOURCE_TYPE_MAP.put("RT_Labor", ResourceType.WORK);
       RESOURCE_TYPE_MAP.put("RT_Mat", ResourceType.MATERIAL);
-      RESOURCE_TYPE_MAP.put("RT_Equip", ResourceType.WORK);
+      RESOURCE_TYPE_MAP.put("RT_Equip", ResourceType.COST);
    }
 
    private static final Map<String, ConstraintType> CONSTRAINT_TYPE_MAP = new HashMap<String, ConstraintType>();
@@ -1770,6 +1772,8 @@ final class PrimaveraReader
       CONSTRAINT_TYPE_MAP.put("CS_ALAP", ConstraintType.AS_LATE_AS_POSSIBLE);
       CONSTRAINT_TYPE_MAP.put("CS_MANDSTART", ConstraintType.MUST_START_ON);
       CONSTRAINT_TYPE_MAP.put("CS_MANDFIN", ConstraintType.MUST_FINISH_ON);
+      CONSTRAINT_TYPE_MAP.put("CS_MANDSTART", ConstraintType.MANDATORY_START);
+      CONSTRAINT_TYPE_MAP.put("CS_MANDFIN", ConstraintType.MANDATORY_FINISH);
    }
 
    private static final Map<String, Priority> PRIORITY_MAP = new HashMap<String, Priority>();

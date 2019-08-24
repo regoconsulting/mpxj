@@ -9,7 +9,7 @@
 	<artifactId>mpxj</artifactId>
 
 	<!-- Note - this is automatically updated by the ant build ... don't remove the MPXJ comment! -->
-	<!-- MPXJ --><version>7.7.1</version>
+	<!-- MPXJ --><version>7.9.2</version>
 
 	<name>MPXJ</name>
 	<url>http://mpxj.org</url>
@@ -165,7 +165,10 @@
 		</contributor>
 		<contributor>
 			<name>Gary McKenney</name>
-		</contributor>
+		</contributor>				
+		<contributor>
+			<name>Tiago de Mello</name>
+		</contributor>		
 		<contributor>
 			<name>Scott Melville</name>
 		</contributor>
@@ -174,7 +177,10 @@
 		</contributor>
 		<contributor>
 			<name>Andrei Missine</name>
-		</contributor>
+		</contributor>				
+		<contributor>
+			<name>ninthwaveltd</name>
+		</contributor>		
 		<contributor>
 			<name>Jari Niskala</name>
 		</contributor>
@@ -184,6 +190,15 @@
 		<contributor>
 			<name>Paul Pogonyshev</name>
 		</contributor>
+		<contributor>
+			<name>Daniel Schmidt</name>
+		</contributor>
+		<contributor>
+			<name>Sruthi-Ganesh</name>
+		</contributor>
+		<contributor>
+			<name>Sebastian Stock</name>
+		</contributor>		
 		<contributor>
 			<name>James Styles</name>
 		</contributor>
@@ -335,6 +350,7 @@
 				<configuration>
 					<additionalparam>-Xdoclint:none</additionalparam>
 					<notimestamp>true</notimestamp>
+					<excludePackageNames>*.schema.*</excludePackageNames>
 				</configuration>
 				<executions>
 					<execution>
@@ -436,6 +452,7 @@
 				<configuration>
 					<additionalparam>-Xdoclint:none</additionalparam>
 					<notimestamp>true</notimestamp>
+					<excludePackageNames>*.schema.*</excludePackageNames>
 				</configuration>
 			</plugin>
 

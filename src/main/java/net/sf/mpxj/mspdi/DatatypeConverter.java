@@ -31,9 +31,9 @@ import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+import java.util.UUID;
 
 import net.sf.mpxj.AccrueType;
 import net.sf.mpxj.BookingType;
@@ -70,7 +70,7 @@ public final class DatatypeConverter
     */
    public static final String printExtendedAttributeCurrency(Number value)
    {
-      return (value == null ? null : getNumberFormat().format(value.doubleValue() * 100));
+      return (value == null ? null : NUMBER_FORMAT.get().format(value.doubleValue() * 100));
    }
 
    /**
@@ -102,7 +102,7 @@ public final class DatatypeConverter
     */
    public static final String printExtendedAttributeNumber(Number value)
    {
-      return (getNumberFormat().format(value.doubleValue()));
+      return (NUMBER_FORMAT.get().format(value.doubleValue()));
    }
 
    /**
@@ -146,7 +146,7 @@ public final class DatatypeConverter
     */
    public static final String printExtendedAttributeDate(Date value)
    {
-      return (value == null ? null : getDateFormat().format(value));
+      return (value == null ? null : DATE_FORMAT.get().format(value));
    }
 
    /**
@@ -163,7 +163,7 @@ public final class DatatypeConverter
       {
          try
          {
-            result = getDateFormat().parse(value);
+            result = DATE_FORMAT.get().parse(value);
          }
 
          catch (ParseException ex)
@@ -566,94 +566,21 @@ public final class DatatypeConverter
    }
 
    /**
-    * Print date.
-    *
-    * @param value Date value
-    * @return Calendar value
-    */
-   public static final Calendar printDate(Date value)
-   {
-      Calendar cal = null;
-
-      if (value != null)
-      {
-         cal = Calendar.getInstance();
-         cal.setTime(value);
-         cal.set(Calendar.MILLISECOND, 0);
-         cal.set(Calendar.SECOND, 0);
-      }
-
-      return (cal);
-   }
-
-   /**
-    * Parse date.
-    *
-    * @param value Calendar value
-    * @return Date value
-    */
-   public static final Date parseDate(Calendar value)
-   {
-      Date result = null;
-
-      if (value != null)
-      {
-         Calendar cal = Calendar.getInstance();
-         cal.set(Calendar.YEAR, value.get(Calendar.YEAR));
-         cal.set(Calendar.MONTH, value.get(Calendar.MONTH));
-         cal.set(Calendar.DAY_OF_MONTH, value.get(Calendar.DAY_OF_MONTH));
-         cal.set(Calendar.HOUR_OF_DAY, value.get(Calendar.HOUR_OF_DAY));
-         cal.set(Calendar.MINUTE, value.get(Calendar.MINUTE));
-         cal.set(Calendar.SECOND, value.get(Calendar.SECOND));
-         cal.set(Calendar.MILLISECOND, value.get(Calendar.MILLISECOND));
-         result = cal.getTime();
-      }
-
-      return (result);
-   }
-
-   /**
     * Print time.
     *
     * @param value time value
     * @return calendar value
     */
-   public static final Calendar printTime(Date value)
+   public static final String printTime(Date value)
    {
-      Calendar cal = null;
+      String result = null;
 
       if (value != null)
       {
-         cal = Calendar.getInstance();
-         cal.setTime(value);
-         cal.set(Calendar.MILLISECOND, 0);
-         cal.set(Calendar.SECOND, 0);
+         result = TIME_FORMAT.get().format(value);
       }
 
-      return (cal);
-   }
-
-   /**
-    * Parse time.
-    *
-    * @param value Calendar value
-    * @return time value
-    */
-   public static final Date parseTime(Calendar value)
-   {
-      Date result = null;
-
-      if (value != null)
-      {
-         Calendar cal = Calendar.getInstance();
-         cal.set(Calendar.HOUR_OF_DAY, value.get(Calendar.HOUR_OF_DAY));
-         cal.set(Calendar.MINUTE, value.get(Calendar.MINUTE));
-         cal.set(Calendar.SECOND, value.get(Calendar.SECOND));
-         cal.set(Calendar.MILLISECOND, value.get(Calendar.MILLISECOND));
-         result = cal.getTime();
-      }
-
-      return (result);
+      return result;
    }
 
    /**
@@ -1448,6 +1375,28 @@ public final class DatatypeConverter
    }
 
    /**
+    * Convert the MSPDI representation of a UUID into a Java UUID instance.
+    *
+    * @param value MSPDI UUID
+    * @return Java UUID instance
+    */
+   public static final UUID parseUUID(String value)
+   {
+      return value == null || value.isEmpty() ? null : UUID.fromString(value);
+   }
+
+   /**
+    * Retrieve a UUID in the form required by MSPDI.
+    *
+    * @param guid UUID instance
+    * @return formatted UUID
+    */
+   public static String printUUID(UUID guid)
+   {
+      return guid == null ? null : guid.toString();
+   }
+
+   /**
     * Parse duration represented as an arbitrary fraction of minutes.
     *
     * @param properties project properties
@@ -1631,7 +1580,32 @@ public final class DatatypeConverter
     */
    public static final BigInteger printConstraintType(ConstraintType value)
    {
-      return (value == null ? null : BigInteger.valueOf(value.getValue()));
+      if (value == null)
+      {
+         return null;
+      }
+
+      switch (value)
+      {
+         case MANDATORY_START:
+         {
+            value = ConstraintType.MUST_START_ON;
+            break;
+         }
+
+         case MANDATORY_FINISH:
+         {
+            value = ConstraintType.MUST_FINISH_ON;
+            break;
+         }
+
+         default:
+         {
+            break;
+         }
+      }
+
+      return BigInteger.valueOf(value.getValue());
    }
 
    /**
@@ -1711,39 +1685,27 @@ public final class DatatypeConverter
    }
 
    /**
-    * Print a time value.
-    *
-    * @param value time value
-    * @return time value
-    */
-   public static final String printTime(Calendar value)
-   {
-      return (value == null ? null : getTimeFormat().format(value.getTime()));
-   }
-
-   /**
     * Parse a time value.
     *
     * @param value time value
     * @return time value
     */
-   public static final Calendar parseTime(String value)
+   public static final Date parseTime(String value)
    {
-      Calendar cal = null;
+      Date result = null;
       if (value != null && value.length() != 0)
       {
-         cal = Calendar.getInstance();
          try
          {
-            cal.setTime(getTimeFormat().parse(value));
+            result = TIME_FORMAT.get().parse(value);
          }
 
          catch (ParseException ex)
          {
-            cal = null;
+            // Ignore parse errors
          }
       }
-      return (cal);
+      return result;
    }
 
    /**
@@ -1752,9 +1714,9 @@ public final class DatatypeConverter
     * @param value date time value
     * @return string representation
     */
-   public static final String printDateTime(Calendar value)
+   public static final String printDateTime(Date value)
    {
-      return (value == null ? null : getDateFormat().format(value.getTime()));
+      return (value == null ? null : DATE_FORMAT.get().format(value));
    }
 
    /**
@@ -1763,25 +1725,24 @@ public final class DatatypeConverter
     * @param value string representation
     * @return date time value
     */
-   public static final Calendar parseDateTime(String value)
+   public static final Date parseDateTime(String value)
    {
-      Calendar result = null;
+      Date result = null;
 
       if (value != null && value.length() != 0)
       {
          try
          {
-            result = Calendar.getInstance();
-            result.setTime(getDateFormat().parse(value));
+            result = DATE_FORMAT.get().parse(value);
          }
 
          catch (ParseException ex)
          {
-            result = null;
+            // Ignore parse errors
          }
       }
 
-      return (result);
+      return result;
    }
 
    /**
@@ -1823,60 +1784,6 @@ public final class DatatypeConverter
    }
 
    /**
-    * Retrieve a number formatter.
-    *
-    * @return NumberFormat instance
-    */
-   private static final NumberFormat getNumberFormat()
-   {
-      NumberFormat format = NUMBER_FORMAT.get();
-      if (format == null)
-      {
-         // XML numbers should use . as decimal separator and no grouping.
-         format = new DecimalFormat("#.##", new DecimalFormatSymbols(Locale.US));
-         format.setGroupingUsed(false);
-         NUMBER_FORMAT.set(format);
-      }
-      return (format);
-   }
-
-   /**
-    * Retrieve a date formatter.
-    *
-    * @return DateFormat instance
-    */
-   private static final DateFormat getDateFormat()
-   {
-      DateFormat df = DATE_FORMAT.get();
-      if (df == null)
-      {
-         df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-         df.setLenient(false);
-         DATE_FORMAT.set(df);
-      }
-      return (df);
-
-   }
-
-   /**
-    * Retrieve a time formatter.
-    *
-    * @return DateFormat instance
-    */
-   private static final DateFormat getTimeFormat()
-   {
-      DateFormat df = TIME_FORMAT.get();
-      if (df == null)
-      {
-         df = new SimpleDateFormat("HH:mm:ss");
-         df.setLenient(false);
-         TIME_FORMAT.set(df);
-      }
-      return (df);
-
-   }
-
-   /**
     * Detect numbers using comma as a decimal separator and replace with period.
     *
     * @param value original numeric value
@@ -1899,9 +1806,38 @@ public final class DatatypeConverter
       return result;
    }
 
-   private static final ThreadLocal<DateFormat> DATE_FORMAT = new ThreadLocal<DateFormat>();
-   private static final ThreadLocal<DateFormat> TIME_FORMAT = new ThreadLocal<DateFormat>();
-   private static final ThreadLocal<NumberFormat> NUMBER_FORMAT = new ThreadLocal<NumberFormat>();
-   private static final BigDecimal BIGDECIMAL_ONE = BigDecimal.valueOf(1);
+   private static final ThreadLocal<DateFormat> DATE_FORMAT = new ThreadLocal<DateFormat>()
+   {
+      @Override protected DateFormat initialValue()
+      {
+         DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+         df.setLenient(false);
+         return df;
+      }
+   };
+
+   private static final ThreadLocal<DateFormat> TIME_FORMAT = new ThreadLocal<DateFormat>()
+   {
+      @Override protected DateFormat initialValue()
+      {
+         DateFormat df = new SimpleDateFormat("HH:mm:ss");
+         df.setLenient(false);
+         return df;
+      }
+   };
+
+   private static final ThreadLocal<NumberFormat> NUMBER_FORMAT = new ThreadLocal<NumberFormat>()
+   {
+      @Override protected NumberFormat initialValue()
+      {
+         // XML numbers should use . as decimal separator and no grouping.
+         DecimalFormat format = new DecimalFormat("#.##", new DecimalFormatSymbols(Locale.US));
+         format.setGroupingUsed(false);
+         return format;
+      }
+   };
+
    private static final ThreadLocal<ProjectFile> PARENT_FILE = new ThreadLocal<ProjectFile>();
+
+   private static final BigDecimal BIGDECIMAL_ONE = BigDecimal.valueOf(1);
 }

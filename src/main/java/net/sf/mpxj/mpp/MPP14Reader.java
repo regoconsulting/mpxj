@@ -39,7 +39,6 @@ import org.apache.poi.poifs.filesystem.DocumentEntry;
 import org.apache.poi.poifs.filesystem.DocumentInputStream;
 
 import net.sf.mpxj.AssignmentField;
-import net.sf.mpxj.DateRange;
 import net.sf.mpxj.Duration;
 import net.sf.mpxj.EventManager;
 import net.sf.mpxj.FieldContainer;
@@ -95,7 +94,8 @@ final class MPP14Reader implements MPPVariantReader
             processConstraintData();
             processAssignmentData();
             postProcessTasks();
-
+            processDataLinks();
+            
             if (reader.getReadPresentationData())
             {
                processViewPropertyData();
@@ -206,10 +206,13 @@ final class MPP14Reader implements MPPVariantReader
    private void processCustomValueLists() throws IOException
    {
       DirectoryEntry taskDir = (DirectoryEntry) m_projectDir.getEntry("TBkndTask");
-      Props taskProps = new Props14(m_inputStreamFactory.getInstance(taskDir, "Props"));
+      if (taskDir.hasEntry("Props"))
+      {
+         Props taskProps = new Props14(m_inputStreamFactory.getInstance(taskDir, "Props"));
 
-      CustomFieldValueReader14 reader = new CustomFieldValueReader14(m_file.getProjectProperties(), m_file.getCustomFields(), m_outlineCodeVarMeta, m_outlineCodeVarData, m_outlineCodeFixedData, m_outlineCodeFixedData2, taskProps);
-      reader.process();
+         CustomFieldValueReader14 reader = new CustomFieldValueReader14(m_file.getProjectProperties(), m_file.getCustomFields(), m_outlineCodeVarMeta, m_outlineCodeVarData, m_outlineCodeFixedData, m_outlineCodeFixedData2, taskProps);
+         reader.process();
+      }
    }
 
    /**
@@ -957,10 +960,9 @@ final class MPP14Reader implements MPPVariantReader
       Var2Data taskVarData = new Var2Data(taskVarMeta, new DocumentInputStream(((DocumentEntry) taskDir.getEntry("Var2Data"))));
       FixedMeta taskFixedMeta = new FixedMeta(new DocumentInputStream(((DocumentEntry) taskDir.getEntry("FixedMeta"))), 47);
       FixedData taskFixedData = new FixedData(taskFixedMeta, new DocumentInputStream(((DocumentEntry) taskDir.getEntry("FixedData"))), fieldMap.getMaxFixedDataSize(0));
-      FixedMeta taskFixed2Meta = new FixedMeta(new DocumentInputStream(((DocumentEntry) taskDir.getEntry("Fixed2Meta"))), taskFixedData, 92, 93, 94);
+      FixedMeta taskFixed2Meta = new FixedMeta(new DocumentInputStream(((DocumentEntry) taskDir.getEntry("Fixed2Meta"))), taskFixedData, 92, 93, 94, 95);
       FixedData taskFixed2Data = new FixedData(taskFixed2Meta, new DocumentInputStream(((DocumentEntry) taskDir.getEntry("Fixed2Data"))));
 
-      Props14 props = new Props14(m_inputStreamFactory.getInstance(taskDir, "Props"));
       //      System.out.println(taskFixedMeta);
       //      System.out.println(taskFixedData);
       //      System.out.println(taskVarMeta);
@@ -969,11 +971,14 @@ final class MPP14Reader implements MPPVariantReader
       //      System.out.println(taskFixed2Data);
       //      System.out.println(m_outlineCodeVarData.getVarMeta());
       //      System.out.println(m_outlineCodeVarData);
-      //      System.out.println(props);
 
       // Process aliases
-      new CustomFieldAliasReader(m_file.getCustomFields(), props.getByteArray(TASK_FIELD_NAME_ALIASES)).process();
-
+      if (taskDir.hasEntry("Props"))
+      {
+         Props14 props = new Props14(m_inputStreamFactory.getInstance(taskDir, "Props"));
+         new CustomFieldAliasReader(m_file.getCustomFields(), props.getByteArray(TASK_FIELD_NAME_ALIASES)).process();
+      }
+      
       TreeMap<Integer, Integer> taskMap = createTaskMap(fieldMap, taskFixedMeta, taskFixedData, taskVarData);
       // The var data may not contain all the tasks as tasks with no var data assigned will
       // not be saved in there. Most notably these are tasks with no name. So use the task map
@@ -1234,14 +1239,6 @@ final class MPP14Reader implements MPPVariantReader
          }
 
          //
-         // If this is a split task, allocate space for the split durations
-         //
-         if ((metaData[9] & 0x80) == 0)
-         {
-            task.setSplits(new LinkedList<DateRange>());
-         }
-
-         //
          // If this is a manually scheduled task, read the manual duration
          //
          if (task.getTaskMode() != TaskMode.MANUALLY_SCHEDULED)
@@ -1316,9 +1313,7 @@ final class MPP14Reader implements MPPVariantReader
       // space for later inserts.
       //
       TreeMap<Integer, Integer> taskMap = new TreeMap<Integer, Integer>();
-
-      // I've found a pathological case of an MPP file with around 102k blank tasks...
-      int nextIDIncrement = 102000;
+      int nextIDIncrement = ((m_nullTaskOrder.size() / 1000) + 1) * 1000;
       int nextID = (m_file.getTaskByUniqueID(Integer.valueOf(0)) == null ? nextIDIncrement : 0);
       for (Map.Entry<Long, Integer> entry : m_taskOrder.entrySet())
       {
@@ -1596,18 +1591,21 @@ final class MPP14Reader implements MPPVariantReader
       FixedData rscFixedData = new FixedData(rscFixedMeta, m_inputStreamFactory.getInstance(rscDir, "FixedData"));
       FixedMeta rscFixed2Meta = new FixedMeta(new DocumentInputStream(((DocumentEntry) rscDir.getEntry("Fixed2Meta"))), 50);
       FixedData rscFixed2Data = new FixedData(rscFixed2Meta, m_inputStreamFactory.getInstance(rscDir, "Fixed2Data"));
-      Props14 props = new Props14(m_inputStreamFactory.getInstance(rscDir, "Props"));
+
       //System.out.println(rscVarMeta);
       //System.out.println(rscVarData);
       //System.out.println(rscFixedMeta);
       //System.out.println(rscFixedData);
       //System.out.println(rscFixed2Meta);
       //System.out.println(rscFixed2Data);
-      //System.out.println(props);
 
       // Process aliases
-      new CustomFieldAliasReader(m_file.getCustomFields(), props.getByteArray(RESOURCE_FIELD_NAME_ALIASES)).process();
-
+      if (rscDir.hasEntry("Props"))
+      {
+         Props14 props = new Props14(m_inputStreamFactory.getInstance(rscDir, "Props"));
+         new CustomFieldAliasReader(m_file.getCustomFields(), props.getByteArray(RESOURCE_FIELD_NAME_ALIASES)).process();
+      }
+      
       TreeMap<Integer, Integer> resourceMap = createResourceMap(fieldMap, rscFixedMeta, rscFixedData);
       Integer[] uniqueid = rscVarMeta.getUniqueIdentifierArray();
       Integer id;
@@ -1940,6 +1938,21 @@ final class MPP14Reader implements MPPVariantReader
       reader.process(m_file, fixedData, varData, m_fontBases);
    }
 
+   /**
+    * Read data link definitions.
+    */
+   private void processDataLinks()throws IOException
+   {
+      DirectoryEntry dir = (DirectoryEntry) m_viewDir.getEntry("CEdl");
+      FixedMeta fixedMeta = new FixedMeta(new DocumentInputStream(((DocumentEntry) dir.getEntry("FixedMeta"))), 11);
+      FixedData fixedData = new FixedData(fixedMeta, m_inputStreamFactory.getInstance(dir, "FixedData"));
+      VarMeta varMeta = new VarMeta12(new DocumentInputStream(((DocumentEntry) dir.getEntry("VarMeta"))));
+      Var2Data varData = new Var2Data(varMeta, new DocumentInputStream(((DocumentEntry) dir.getEntry("Var2Data"))));
+
+      DataLinkFactory factory = new DataLinkFactory(m_file, fixedData, varData);
+      factory.process();
+   }
+   
    /**
     * Retrieve custom field value.
     *

@@ -356,6 +356,7 @@ public final class P3DatabaseReader implements ProjectReader
                }
                task.setName(name);
                task.setWBS(wbs);
+               task.setSummary(true);
                m_wbsMap.put(wbs, task);
             }
          }
@@ -526,7 +527,7 @@ public final class P3DatabaseReader implements ProjectReader
     */
    private void updateDates(Task parentTask)
    {
-      if (parentTask.getSummary())
+      if (parentTask.hasChildTasks())
       {
          int finished = 0;
          Date startDate = parentTask.getStart();

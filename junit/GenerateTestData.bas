@@ -22,6 +22,37 @@ Sub GenerateAll()
     GenerateResourceCustomNumbers
     GenerateResourceCustomText
     GenerateResourceTypes
+    GenerateDataLinks
+End Sub
+
+Sub GenerateXmlVersions()
+    Dim prefix As String
+    prefix = Environ("MPXJ_PRIVATE") & "\data\MPP\"
+    
+    Dim files() As String
+    ReDim files(1000)
+    Dim fileIndex As Long
+    
+    file = Dir(prefix & "*.mpp")
+    Do Until file = ""
+        files(fileIndex) = file
+        fileIndex = fileIndex + 1
+        file = Dir
+    Loop
+    
+    ReDim Preserve files(fileIndex - 1)
+    
+    For fileIndex = 0 To UBound(files)
+        file = files(fileIndex)
+        xmlFile = prefix & file & ".xml"
+        If Len(Dir(xmlFile)) = 0 Then
+            Debug.Print "Processing: " & file
+            FileOpenEx Name:=prefix & file, ReadOnly:=True, NoAuto:=True, openPool:=pjDoNotOpenPool
+            FileSaveAs Name:=xmlFile, FormatID:="MSProject.XML"
+            FileCloseEx pjDoNotSave
+            Debug.Print "Done."
+        End If
+    Next fileIndex
 End Sub
 
 Sub NameThatField(value As Long)
@@ -861,6 +892,37 @@ Sub GenerateResourceCustomText()
 
     FileClose pjDoNotSave
 
+End Sub
+
+Sub GenerateDataLinks
+    Set Task1 = ActiveProject.Tasks.Add("Task 1")
+    SetTaskField Field:="Task Mode", Value:="No", TaskID:=Task1.ID
+    SetTaskField Field:="Start", Value:="01/01/2014 09:00", TaskID:=Task1.ID
+    SetTaskField Field:="Duration", Value:="5", TaskID:=Task1.ID
+    
+    Set Task2 = ActiveProject.Tasks.Add("Task 2")
+    SetTaskField Field:="Task Mode", Value:="No", TaskID:=Task2.ID
+    SetTaskField Field:="Start", Value:="01/01/2014 09:00", TaskID:=Task2.ID
+    SetTaskField Field:="Duration", Value:="5", TaskID:=Task2.ID
+    
+    Set Task3 = ActiveProject.Tasks.Add("Task 3")
+    SetTaskField Field:="Task Mode", Value:="No", TaskID:=Task3.ID
+    SetTaskField Field:="Start", Value:="01/01/2014 09:00", TaskID:=Task3.ID
+    SetTaskField Field:="Duration", Value:="5", TaskID:=Task3.ID
+
+    SelectTaskField RowRelative:=False, Row:=1, Column:="Finish"
+    EditCopy
+    SelectTaskField RowRelative:=False, Row:=2, Column:="Start"
+    EditPasteSpecial Link:=True, Type:=2, DisplayAsIcon:=False
+
+    SelectTaskField RowRelative:=False, Row:=2, Column:="Finish"
+    EditCopy
+    SelectTaskField RowRelative:=False, Row:=3, Column:="Start"
+    EditPasteSpecial Link:=True, Type:=2, DisplayAsIcon:=False
+    
+    SaveFiles "data-links"
+
+    FileClose pjDoNotSave
 End Sub
 
 ' If you have a file which contains manually created test data

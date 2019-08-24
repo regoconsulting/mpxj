@@ -25,11 +25,13 @@ package net.sf.mpxj.synchro;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.UUID;
 
 import net.sf.mpxj.Duration;
 import net.sf.mpxj.TimeUnit;
+import net.sf.mpxj.common.CharsetHelper;
 import net.sf.mpxj.common.DateHelper;
 
 /**
@@ -185,10 +187,17 @@ final class DatatypeConverter
          throw new IllegalArgumentException("Unexpected string format");
       }
 
+      Charset charset = CharsetHelper.UTF8;
+      
       int length = is.read();
       if (length == 0xFF)
       {
          length = getShort(is);
+         if (length == 0xFFFE)
+         {
+            charset = CharsetHelper.UTF16LE;
+            length = (is.read() * 2);
+         }
       }
 
       String result;
@@ -198,12 +207,12 @@ final class DatatypeConverter
       }
       else
       {
-         byte[] stringData = new byte[length];
+         byte[] stringData = new byte[length];         
          is.read(stringData);
-         result = new String(stringData);
+         result = new String(stringData, charset);
       }
       return result;
-   }
+   }   
 
    /**
     * Retrieve a boolean from an input stream.
@@ -260,7 +269,7 @@ final class DatatypeConverter
    public static final Date getDate(InputStream is) throws IOException
    {
       long timeInSeconds = getInt(is);
-      if (timeInSeconds == 0x93406FFF)
+      if (timeInSeconds == NULL_SECONDS)
       {
          return null;
       }
@@ -291,9 +300,14 @@ final class DatatypeConverter
     */
    public static final Duration getDuration(InputStream is) throws IOException
    {
-      double durationInSeconds = getInt(is);
-      durationInSeconds /= (60 * 60);
-      return Duration.getInstance(durationInSeconds, TimeUnit.HOURS);
+      int durationInSeconds = getInt(is);
+      if (durationInSeconds == NULL_SECONDS)
+      {
+         return null;
+      }
+      double durationInHours = durationInSeconds;
+      durationInHours /= (60 * 60);
+      return Duration.getInstance(durationInHours, TimeUnit.HOURS);
    }
 
    /**
@@ -311,4 +325,6 @@ final class DatatypeConverter
       }
       return Double.valueOf(result);
    }
+   
+   private static final int NULL_SECONDS = 0x93406FFF;
 }

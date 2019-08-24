@@ -38,7 +38,8 @@ public final class MppXmlCompare
    {
       m_xml = xml;
       m_mpp = mpp;
-
+      m_fileVersion = mpp.getProjectProperties().getMppFileType().intValue();
+      
       //compareProperties
       compareResources();
       compareTasks();
@@ -60,6 +61,8 @@ public final class MppXmlCompare
 
       for (Task xmlTask : xmlTasks)
       {
+         m_currentEntity = xmlTask;
+         
          // too much variability
          if (NumberHelper.getInt(xmlTask.getUniqueID()) == 0)
          {
@@ -166,7 +169,7 @@ public final class MppXmlCompare
          assertEquals(xmlTask.getFlag(17), mppTask.getFlag(17));
          assertEquals(xmlTask.getFlag(18), mppTask.getFlag(18));
          assertEquals(xmlTask.getFlag(19), mppTask.getFlag(19));
-         assertEquals(xmlTask.getFlag(20), mppTask.getFlag(20));
+         assertEquals(xmlTask.getFlag(20), mppTask.getFlag(20));         
          assertEquals(xmlTask.getHideBar(), mppTask.getHideBar());
          assertEquals(xmlTask.getHyperlink(), mppTask.getHyperlink());
          assertEquals(xmlTask.getHyperlinkAddress(), mppTask.getHyperlinkAddress());
@@ -278,6 +281,11 @@ public final class MppXmlCompare
          //assertEquals(xmlTask.getCostVariance(), mppTask.getCostVariance());
          //assertEquals(xmlTask.getCalendar().getName(), mppTask.getCalendar().getName());
          //assertEquals(xmlTask.getSubproject(), mppTask.getSubproject());
+         
+         if (m_fileVersion > 9)
+         {
+            assertEquals(xmlTask.getGUID(), mppTask.getGUID());
+         }
       }
    }
 
@@ -294,6 +302,8 @@ public final class MppXmlCompare
 
       for (Resource xmlResource : xmlResources)
       {
+         m_currentEntity = xmlResource;
+         
          // too much variability
          if (NumberHelper.getInt(xmlResource.getUniqueID()) == 0)
          {
@@ -482,6 +492,11 @@ public final class MppXmlCompare
          // check this failure
          //assertEquals(xmlResource.getCostVariance(), mppResource.getCostVariance());
          //assertEquals(xmlResource.getWorkVariance(), mppResource.getWorkVariance());
+         
+         if (m_fileVersion > 9)
+         {
+            assertEquals(xmlResource.getGUID(), mppResource.getGUID());
+         }
       }
    }
 
@@ -519,7 +534,7 @@ public final class MppXmlCompare
          return;
       }
 
-      throw new Exception("Expected: " + expected + " Found: " + actual);
+      throw new Exception("Expected: " + expected + " Found: " + actual + " (Current Entity=" + m_currentEntity + " MPP File Type=" + m_mpp.getProjectProperties().getMppFileType() + ")");
    }
 
    /**
@@ -556,7 +571,7 @@ public final class MppXmlCompare
    {
       if (expected != actual)
       {
-         throw new Exception("Expected: " + expected + " Found: " + actual);
+         throw new Exception("Expected: " + expected + " Found: " + actual + " (Current Entity=" + m_currentEntity + " MPP File Type=" + m_mpp.getProjectProperties().getMppFileType() + ")");
       }
    }
 
@@ -574,14 +589,14 @@ public final class MppXmlCompare
       {
          if (!(expected == actual))
          {
-            throw new Exception("Expected: " + expected + " Found: " + actual);
+            throw new Exception("Expected: " + expected + " Found: " + actual + " (Current Entity=" + m_currentEntity + " MPP File Type=" + m_mpp.getProjectProperties().getMppFileType() + ")");
          }
       }
       else
       {
          if (!(Math.abs(expected - actual) <= delta))
          {
-            throw new Exception("Expected: " + expected + " Found: " + actual);
+            throw new Exception("Expected: " + expected + " Found: " + actual + " (Current Entity=" + m_currentEntity + " MPP File Type=" + m_mpp.getProjectProperties().getMppFileType() + ")");
          }
       }
    }
@@ -682,4 +697,6 @@ public final class MppXmlCompare
 
    private ProjectFile m_xml;
    private ProjectFile m_mpp;
+   private int m_fileVersion;
+   private Object m_currentEntity;
 }

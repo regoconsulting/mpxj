@@ -29,6 +29,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
+import net.sf.mpxj.common.DateHelper;
+
 /**
  * Column containing dates.
  */
@@ -64,7 +66,7 @@ class DateColumn extends AbstractColumn
       FixedSizeItemsBlock data = new FixedSizeItemsBlock().read(buffer, offset);
       offset = data.getOffset();
 
-      Calendar cal = Calendar.getInstance();
+      Calendar cal = DateHelper.popCalendar();
       byte[][] rawData = data.getData();
       m_data = new Date[rawData.length];
       for (int index = 0; index < rawData.length; index++)
@@ -77,11 +79,17 @@ class DateColumn extends AbstractColumn
             {
                cal.setTimeInMillis(DATE_EPOCH);
                cal.add(Calendar.DAY_OF_YEAR, value);
-               m_data[index] = cal.getTime();
+               int year = cal.get(Calendar.YEAR);
+               // Sanity test: ignore dates with obviously incorrect years
+               if (year > 1980 && year < 2100)
+               {
+                  m_data[index] = cal.getTime();
+               }               
             }
          }
       }
-
+      DateHelper.pushCalendar(cal);
+      
       return offset;
    }
 

@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -68,8 +70,10 @@ import net.sf.mpxj.Resource;
 import net.sf.mpxj.ResourceAssignment;
 import net.sf.mpxj.Task;
 import net.sf.mpxj.TaskField;
+import net.sf.mpxj.TaskType;
 import net.sf.mpxj.TimeUnit;
 import net.sf.mpxj.common.BooleanHelper;
+import net.sf.mpxj.common.DateHelper;
 import net.sf.mpxj.common.FieldTypeHelper;
 import net.sf.mpxj.common.NumberHelper;
 import net.sf.mpxj.primavera.schema.APIBusinessObjects;
@@ -123,6 +127,28 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
    }
 
    /**
+    * Set the task field which will be used to populate the Activity Type attribute
+    * in the PMXML file.
+    *
+    * @param field TaskField instance
+    */
+   public void setActivityTypeField(TaskField field)
+   {
+      m_activityTypeField = field;
+   }
+
+   /**
+    * Retrieve the task field which will be used to populate the Activity Type attribute
+    * in the PMXML file.
+    *
+    * @return TaskField instance
+    */
+   public TaskField getActivityTypeField()
+   {
+      return m_activityTypeField;
+   }
+   
+   /**
     * {@inheritDoc}
     */
    @Override public void write(ProjectFile projectFile, OutputStream stream) throws IOException
@@ -163,7 +189,6 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
          }
 
          m_projectFile = projectFile;
-         m_calendar = Calendar.getInstance();
 
          Marshaller marshaller = CONTEXT.createMarshaller();
 
@@ -171,6 +196,9 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
 
          m_factory = new ObjectFactory();
          m_apibo = m_factory.createAPIBusinessObjects();
+
+         configureCustomFields();
+         populateSortedCustomFieldsList();
 
          writeCurrency();
          writeUserFieldDefinitions();
@@ -201,7 +229,7 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
          m_project = null;
          m_wbsSequence = 0;
          m_relationshipObjectID = 0;
-         m_calendar = null;
+         m_sortedCustomFieldsList = null;
       }
    }
 
@@ -308,7 +336,7 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
     */
    private void writeUserFieldDefinitions()
    {
-      for (CustomField cf : m_projectFile.getCustomFields())
+      for (CustomField cf : m_sortedCustomFieldsList)
       {
          if (cf.getFieldType() != null && cf.getFieldType().getDataType() != null)
          {
@@ -444,15 +472,16 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
 
       if (!mpxj.getCalendarExceptions().isEmpty())
       {
+         Calendar calendar = DateHelper.popCalendar();
          for (ProjectCalendarException mpxjException : mpxj.getCalendarExceptions())
          {
-            m_calendar.setTime(mpxjException.getFromDate());
-            while (m_calendar.getTimeInMillis() < mpxjException.getToDate().getTime())
+            calendar.setTime(mpxjException.getFromDate());
+            while (calendar.getTimeInMillis() < mpxjException.getToDate().getTime())
             {
                HolidayOrException xmlException = m_factory.createCalendarTypeHolidayOrExceptionsHolidayOrException();
                xmlExceptions.getHolidayOrException().add(xmlException);
 
-               xmlException.setDate(m_calendar.getTime());
+               xmlException.setDate(calendar.getTime());
 
                for (DateRange range : mpxjException)
                {
@@ -466,9 +495,10 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
                      xmlHours.setFinish(getEndTime(range.getEnd()));
                   }
                }
-               m_calendar.add(Calendar.DAY_OF_YEAR, 1);
+               calendar.add(Calendar.DAY_OF_YEAR, 1);
             }
          }
+         DateHelper.pushCalendar(calendar);
       }
    }
 
@@ -550,7 +580,7 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
    {
       if (!task.getNull())
       {
-         if (task.getSummary())
+         if (extractAndConvertTaskType(task) == null || task.getSummary())
          {
             writeWBS(task);
          }
@@ -611,7 +641,7 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
       xml.setAtCompletionDuration(getDuration(mpxj.getDuration()));
       xml.setCalendarObjectId(getCalendarUniqueID(mpxj.getCalendar()));
       xml.setDurationPercentComplete(getPercentage(mpxj.getPercentageComplete()));
-      xml.setDurationType("Fixed Units/Time");
+      xml.setDurationType(DURATION_TYPE_MAP.get(mpxj.getType()));
       xml.setFinishDate(mpxj.getFinish());
       xml.setGUID(DatatypeConverter.printUUID(mpxj.getGUID()));
       xml.setId(getActivityID(mpxj));
@@ -634,11 +664,36 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
       xml.setRemainingNonLaborUnits(NumberHelper.DOUBLE_ZERO);
       xml.setStartDate(mpxj.getStart());
       xml.setStatus(getActivityStatus(mpxj));
-      xml.setType("Resource Dependent");
+      xml.setType(extractAndConvertTaskType(mpxj));
       xml.setWBSObjectId(parentObjectID);
       xml.getUDF().addAll(writeUDFType(FieldTypeClass.TASK, mpxj));
 
       writePredecessors(mpxj);
+   }
+
+   /**
+    * Attempts to locate the activity type value extracted from an existing P6 schedule.
+    * If necessary converts to the form which can be used in the PMXML file.
+    * Returns "Resource Dependent" as the default value.
+    * 
+    * @param task parent task
+    * @return activity type
+    */
+   private String extractAndConvertTaskType(Task task)
+   {
+      String activityType = (String) task.getCachedValue(m_activityTypeField);
+      if (activityType == null)
+      {
+         activityType = "Resource Dependent";
+      }
+      else
+      {
+         if (ACTIVITY_TYPE_MAP.containsKey(activityType))
+         {
+            activityType = ACTIVITY_TYPE_MAP.get(activityType);
+         }
+      }
+      return activityType;
    }
 
    /**
@@ -737,9 +792,8 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
     */
    private List<UDFAssignmentType> writeUDFType(FieldTypeClass type, FieldContainer mpxj)
    {
-      CustomFieldContainer customFields = m_projectFile.getCustomFields();
-      List<UDFAssignmentType> out = new ArrayList<UDFAssignmentType>(customFields.size());
-      for (CustomField cf : customFields)
+      List<UDFAssignmentType> out = new ArrayList<UDFAssignmentType>();
+      for (CustomField cf : m_sortedCustomFieldsList)
       {
          FieldType fieldType = cf.getFieldType();
          if (fieldType != null && type == fieldType.getFieldTypeClass())
@@ -1014,6 +1068,60 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
    }
 
    /**
+    * Find the fields in which the Activity ID and Activity Type are stored.
+    */
+   private void configureCustomFields()
+   {
+      CustomFieldContainer customFields = m_projectFile.getCustomFields();
+
+      // If the caller hasn't already supplied a value for this field
+      if (m_activityIDField == null)
+      {
+         m_activityIDField = (TaskField) customFields.getFieldByAlias(FieldTypeClass.TASK, "Code");
+         if (m_activityIDField == null)
+         {
+            m_activityIDField = TaskField.WBS;
+         }
+      }
+
+      // If the caller hasn't already supplied a value for this field
+      if (m_activityTypeField == null)
+      {
+         m_activityTypeField = (TaskField) customFields.getFieldByAlias(FieldTypeClass.TASK, "Activity Type");
+      }
+   }
+
+   /**
+    * Populate a sorted list of custom fields to ensure that these fields
+    * are written to the file in a consistent order.
+    */
+   private void populateSortedCustomFieldsList ()
+   {
+      m_sortedCustomFieldsList = new ArrayList<CustomField>();
+      for (CustomField field : m_projectFile.getCustomFields())
+      {
+         FieldType fieldType = field.getFieldType();
+         if (fieldType != null)
+         {
+            m_sortedCustomFieldsList.add(field);
+         }
+      }
+
+      // Sort to ensure consistent order in file
+      Collections.sort(m_sortedCustomFieldsList, new Comparator<CustomField>()
+      {
+         @Override public int compare(CustomField customField1, CustomField customField2)
+         {
+            FieldType o1 = customField1.getFieldType();
+            FieldType o2 = customField2.getFieldType();
+            String name1 = o1.getClass().getSimpleName() + "." + o1.getName() + " " + customField1.getAlias();
+            String name2 = o2.getClass().getSimpleName() + "." + o2.getName() + " " + customField2.getAlias();
+            return name1.compareTo(name2);
+         }
+      });
+   }
+   
+   /**
     * Package-private accessor method used to retrieve the project file
     * currently being processed by this writer.
     *
@@ -1083,17 +1191,37 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
       RELATION_TYPE_MAP.put(RelationType.START_FINISH, "Start to Finish");
    }
 
+   private static final Map<TaskType, String> DURATION_TYPE_MAP = new HashMap<TaskType, String>();
+   static
+   {
+      DURATION_TYPE_MAP.put(TaskType.FIXED_DURATION, "Fixed Duration and Units/Time");
+      DURATION_TYPE_MAP.put(TaskType.FIXED_UNITS, "Fixed Units");
+      DURATION_TYPE_MAP.put(TaskType.FIXED_WORK, "Fixed Duration and Units");
+   }
+
    private static final Map<ConstraintType, String> CONSTRAINT_TYPE_MAP = new HashMap<ConstraintType, String>();
    static
    {
+      CONSTRAINT_TYPE_MAP.put(ConstraintType.MUST_START_ON, "Start On");
       CONSTRAINT_TYPE_MAP.put(ConstraintType.START_NO_LATER_THAN, "Start On or Before");
       CONSTRAINT_TYPE_MAP.put(ConstraintType.START_NO_EARLIER_THAN, "Start On or After");
       CONSTRAINT_TYPE_MAP.put(ConstraintType.MUST_FINISH_ON, "Finish On");
       CONSTRAINT_TYPE_MAP.put(ConstraintType.FINISH_NO_LATER_THAN, "Finish On or Before");
       CONSTRAINT_TYPE_MAP.put(ConstraintType.FINISH_NO_EARLIER_THAN, "Finish On or After");
-      CONSTRAINT_TYPE_MAP.put(ConstraintType.AS_LATE_AS_POSSIBLE, "As Late As Possible");
-      CONSTRAINT_TYPE_MAP.put(ConstraintType.MUST_START_ON, "Mandatory Start");
-      CONSTRAINT_TYPE_MAP.put(ConstraintType.MUST_FINISH_ON, "Mandatory Finish");
+      CONSTRAINT_TYPE_MAP.put(ConstraintType.AS_LATE_AS_POSSIBLE, "As Late As Possible");      
+      CONSTRAINT_TYPE_MAP.put(ConstraintType.MANDATORY_START, "Mandatory Start");
+      CONSTRAINT_TYPE_MAP.put(ConstraintType.MANDATORY_FINISH, "Mandatory Finish");     
+   }
+
+   private static final Map<String, String> ACTIVITY_TYPE_MAP = new HashMap<String, String>();
+   static
+   {
+      ACTIVITY_TYPE_MAP.put("TT_Task", "Task Dependent");
+      ACTIVITY_TYPE_MAP.put("TT_Rsrc", "Resource Dependent");
+      ACTIVITY_TYPE_MAP.put("TT_LOE", "Level of Effort");
+      ACTIVITY_TYPE_MAP.put("TT_Mile", "Start Milestone");
+      ACTIVITY_TYPE_MAP.put("TT_FinMile", "Finish Milestone");
+      ACTIVITY_TYPE_MAP.put("TT_WBS", "WBS Summary");
    }
 
    private ProjectFile m_projectFile;
@@ -1102,6 +1230,7 @@ public final class PrimaveraPMFileWriter extends AbstractProjectWriter
    private ProjectType m_project;
    private int m_wbsSequence;
    private int m_relationshipObjectID;
-   private Calendar m_calendar;
-   private TaskField m_activityIDField = TaskField.WBS;
+   private TaskField m_activityIDField;
+   private TaskField m_activityTypeField;
+   private List<CustomField> m_sortedCustomFieldsList;
 }

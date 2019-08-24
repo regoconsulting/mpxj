@@ -59,6 +59,7 @@ import net.sf.mpxj.Task;
 import net.sf.mpxj.TaskField;
 import net.sf.mpxj.TaskType;
 import net.sf.mpxj.TimeUnit;
+import net.sf.mpxj.common.DateHelper;
 import net.sf.mpxj.common.NumberHelper;
 import net.sf.mpxj.writer.AbstractProjectWriter;
 
@@ -851,11 +852,11 @@ public final class MPXWriter extends AbstractProjectWriter
       Integer result = null;
       if (date != null)
       {
-         Calendar cal = Calendar.getInstance();
-         cal.setTime(date);
+         Calendar cal = DateHelper.popCalendar(date);
          int time = cal.get(Calendar.HOUR_OF_DAY) * 60;
          time += cal.get(Calendar.MINUTE);
-         result = Integer.valueOf(time);
+         DateHelper.pushCalendar(cal);
+         result = Integer.valueOf(time);         
       }
       return (result);
    }
@@ -1119,7 +1120,32 @@ public final class MPXWriter extends AbstractProjectWriter
     */
    private String formatConstraintType(ConstraintType type)
    {
-      return (type == null ? null : LocaleData.getStringArray(m_locale, LocaleData.CONSTRAINT_TYPES)[type.getValue()]);
+      if (type == null)
+      {
+         return null;
+      }
+      
+      switch (type)
+      {
+         case MANDATORY_START:
+         {
+            type = ConstraintType.MUST_START_ON;
+            break;
+         }
+         
+         case MANDATORY_FINISH:
+         {
+            type = ConstraintType.MUST_FINISH_ON;
+            break;
+         }
+         
+         default:
+         {
+            break;
+         }
+      }
+
+      return LocaleData.getStringArray(m_locale, LocaleData.CONSTRAINT_TYPES)[type.getValue()];
    }
 
    /**

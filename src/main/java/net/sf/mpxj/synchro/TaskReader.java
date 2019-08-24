@@ -24,7 +24,6 @@
 package net.sf.mpxj.synchro;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Map;
 
 /**
@@ -37,7 +36,7 @@ class TaskReader extends TableReader
     *
     * @param stream input stream
     */
-   public TaskReader(InputStream stream)
+   public TaskReader(StreamReader stream)
    {
       super(stream);
    }
@@ -63,12 +62,12 @@ class TaskReader extends TableReader
       map.put("UNKNOWN_DATE3", stream.readDate());
       map.put("UNKNOWN_DATE3_EXTRA", stream.readBytes(4));
       map.put("ACTUAL_FINISH", stream.readDate());
-      map.put("UNKNOWN_DATE4_EXTRA", stream.readBytes(4));
-      map.put("UNKNOWN5", stream.readBytes(3));
-      map.put("COMMENTARY", stream.readTableConditional(CommentaryReader.class));
-      map.put("UNKNOWN6", stream.readBytes(4));
+      map.put("UNKNOWN_DATE4_EXTRA", stream.readBytes(4));                
+      map.put("UNKNOWN5", stream.readUnknownTableConditional(85, 0x72B5E632));      
+      map.put("UNKNOWN6", stream.readBytes(2));
+      map.put("COMMENTARY", stream.readTableConditional(CommentaryReader.class));               
       map.put("FILES", stream.readUnknownBlocks(20));
-      map.put("UNKNOWN7", stream.readBytes(8));
+      map.put("UNKNOWN7", stream.readBytes(4));
       map.put("CONSTRAINT_TYPE", stream.readInteger());
       map.put("CONSTRAINT_EARLY_DATE", stream.readDate());
       map.put("CONSTRAINT_EARLY_DATE_EXTRA", stream.readBytes(4));
@@ -78,7 +77,7 @@ class TaskReader extends TableReader
       map.put("URL", stream.readString());
       map.put("PROGRESS_TYPE", stream.readInteger());
       map.put("PERCENT_COMPLETE", stream.readDouble());
-      map.put("UNKNOWN9", stream.readBytes(12));
+      map.put("UNKNOWN9", stream.readUnknownBlocks(20));
       map.put("ID", stream.readString());
       map.put("USER_FIELDS", stream.readTableConditional(UserFieldReader.class));
       map.put("REMAINING_DURATION", stream.readDuration());

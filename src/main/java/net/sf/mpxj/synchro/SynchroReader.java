@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,7 @@ public final class SynchroReader extends AbstractProjectReader
 
          m_calendarMap = new HashMap<UUID, ProjectCalendar>();
          m_taskMap = new HashMap<UUID, Task>();
-         m_predecessorMap = new HashMap<Task, List<MapRow>>();
+         m_predecessorMap = new LinkedHashMap<Task, List<MapRow>>();
          m_resourceMap = new HashMap<UUID, Resource>();
 
          m_data = new SynchroData();
@@ -294,7 +295,7 @@ public final class SynchroReader extends AbstractProjectReader
       task.setHyperlink(row.getString("URL"));
       task.setPercentageComplete(row.getDouble("PERCENT_COMPLETE"));
       task.setNotes(getNotes(row.getRows("COMMENTARY")));
-      task.setMilestone(task.getDuration().getDuration() == 0);
+      task.setMilestone(task.getDuration() != null && task.getDuration().getDuration() == 0);
 
       ProjectCalendar calendar = m_calendarMap.get(row.getUUID("CALENDAR_UUID"));
       if (calendar != m_project.getDefaultCalendar())
@@ -307,7 +308,10 @@ public final class SynchroReader extends AbstractProjectReader
          case 1: // Planned
          {
             task.setStart(row.getDate("PLANNED_START"));
-            task.setFinish(task.getEffectiveCalendar().getDate(task.getStart(), task.getDuration(), false));
+            if (task.getStart() != null && task.getDuration() != null)
+            {
+               task.setFinish(task.getEffectiveCalendar().getDate(task.getStart(), task.getDuration(), false));
+            }
             break;
          }
 
@@ -587,7 +591,7 @@ public final class SynchroReader extends AbstractProjectReader
     */
    private void updateDates(Task parentTask)
    {
-      if (parentTask.getSummary())
+      if (parentTask.hasChildTasks())
       {
          Date plannedStartDate = null;
          Date plannedFinishDate = null;

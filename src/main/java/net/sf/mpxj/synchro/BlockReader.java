@@ -24,7 +24,6 @@
 package net.sf.mpxj.synchro;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,9 +39,9 @@ abstract class BlockReader
     *
     * @param stream input stream
     */
-   public BlockReader(InputStream stream)
+   public BlockReader(StreamReader stream)
    {
-      m_stream = new StreamReader(stream);
+      m_stream = stream;
    }
 
    /**
@@ -53,10 +52,10 @@ abstract class BlockReader
    public List<MapRow> read() throws IOException
    {
       List<MapRow> result = new ArrayList<MapRow>();
-      int fileCount = m_stream.readInt();
-      if (fileCount != 0)
+      int blockCount = m_stream.readInt();
+      if (blockCount != 0)
       {
-         for (int index = 0; index < fileCount; index++)
+         for (int index = 0; index < blockCount; index++)
          {
             // We use a LinkedHashMap to preserve insertion order in iteration
             // Useful when debugging the file format.

@@ -71,6 +71,7 @@ import net.sf.mpxj.ResourceAssignment;
 import net.sf.mpxj.ResourceField;
 import net.sf.mpxj.Task;
 import net.sf.mpxj.TimeUnit;
+import net.sf.mpxj.common.DateHelper;
 import net.sf.mpxj.common.NumberHelper;
 import net.sf.mpxj.common.Pair;
 import net.sf.mpxj.common.ResourceFieldLists;
@@ -205,7 +206,12 @@ public final class GanttProjectReader extends AbstractProjectReader
       mpxjProperties.setCompany(ganttProject.getCompany());
       mpxjProperties.setDefaultDurationUnits(TimeUnit.DAYS);
 
-      m_localeDateFormat = DateFormat.getDateInstance(DateFormat.SHORT, new Locale(ganttProject.getLocale()));
+      String locale = ganttProject.getLocale();
+      if (locale == null)
+      {
+         locale = "en_US";
+      }
+      m_localeDateFormat = DateFormat.getDateInstance(DateFormat.SHORT, new Locale(locale));
    }
 
    /**
@@ -234,14 +240,26 @@ public final class GanttProjectReader extends AbstractProjectReader
    {
       DayTypes dayTypes = gpCalendar.getDayTypes();
       DefaultWeek defaultWeek = dayTypes.getDefaultWeek();
-
-      mpxjCalendar.setWorkingDay(Day.MONDAY, isWorkingDay(defaultWeek.getMon()));
-      mpxjCalendar.setWorkingDay(Day.TUESDAY, isWorkingDay(defaultWeek.getTue()));
-      mpxjCalendar.setWorkingDay(Day.WEDNESDAY, isWorkingDay(defaultWeek.getWed()));
-      mpxjCalendar.setWorkingDay(Day.THURSDAY, isWorkingDay(defaultWeek.getThu()));
-      mpxjCalendar.setWorkingDay(Day.FRIDAY, isWorkingDay(defaultWeek.getFri()));
-      mpxjCalendar.setWorkingDay(Day.SATURDAY, isWorkingDay(defaultWeek.getSat()));
-      mpxjCalendar.setWorkingDay(Day.SUNDAY, isWorkingDay(defaultWeek.getSun()));
+      if (defaultWeek == null)
+      {
+         mpxjCalendar.setWorkingDay(Day.SUNDAY, false);
+         mpxjCalendar.setWorkingDay(Day.MONDAY, true);
+         mpxjCalendar.setWorkingDay(Day.TUESDAY, true);
+         mpxjCalendar.setWorkingDay(Day.WEDNESDAY, true);
+         mpxjCalendar.setWorkingDay(Day.THURSDAY, true);
+         mpxjCalendar.setWorkingDay(Day.FRIDAY, true);
+         mpxjCalendar.setWorkingDay(Day.SATURDAY, false);
+      }
+      else
+      {
+         mpxjCalendar.setWorkingDay(Day.MONDAY, isWorkingDay(defaultWeek.getMon()));
+         mpxjCalendar.setWorkingDay(Day.TUESDAY, isWorkingDay(defaultWeek.getTue()));
+         mpxjCalendar.setWorkingDay(Day.WEDNESDAY, isWorkingDay(defaultWeek.getWed()));
+         mpxjCalendar.setWorkingDay(Day.THURSDAY, isWorkingDay(defaultWeek.getThu()));
+         mpxjCalendar.setWorkingDay(Day.FRIDAY, isWorkingDay(defaultWeek.getFri()));
+         mpxjCalendar.setWorkingDay(Day.SATURDAY, isWorkingDay(defaultWeek.getSat()));
+         mpxjCalendar.setWorkingDay(Day.SUNDAY, isWorkingDay(defaultWeek.getSun()));
+      }
 
       for (Day day : Day.values())
       {
@@ -298,11 +316,12 @@ public final class GanttProjectReader extends AbstractProjectReader
       }
       else
       {
-         Calendar calendar = Calendar.getInstance();
+         Calendar calendar = DateHelper.popCalendar();
          calendar.set(Calendar.YEAR, Integer.parseInt(year));
          calendar.set(Calendar.MONTH, NumberHelper.getInt(date.getMonth()));
          calendar.set(Calendar.DAY_OF_MONTH, NumberHelper.getInt(date.getDate()));
          Date exceptionDate = calendar.getTime();
+         DateHelper.pushCalendar(calendar);
          ProjectCalendarException exception = mpxjCalendar.addCalendarException(exceptionDate, exceptionDate);
 
          // TODO: not sure how NEUTRAL should be handled

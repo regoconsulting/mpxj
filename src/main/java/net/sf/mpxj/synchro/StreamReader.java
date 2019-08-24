@@ -41,11 +41,23 @@ class StreamReader
    /**
     * Constructor.
     *
+    * @param majorVersion major version
     * @param stream input stream
     */
-   public StreamReader(InputStream stream)
+   public StreamReader(int majorVersion, final InputStream stream)
    {
+      m_majorVersion = majorVersion;
       m_stream = stream;
+//      m_stream = new InputStream()
+//      {
+//         @Override public int read() throws IOException
+//         {
+//            ++counter;
+//            return stream.read();
+//         }
+//         
+//         private int counter = 24;
+//      };
    }
 
    /**
@@ -90,7 +102,7 @@ class StreamReader
     */
    public List<MapRow> readUnknownTable(int rowSize, int rowMagicNumber) throws IOException
    {
-      TableReader reader = new UnknownTableReader(m_stream, rowSize, rowMagicNumber);
+      TableReader reader = new UnknownTableReader(this, rowSize, rowMagicNumber);
       reader.read();
       return reader.getRows();
    }
@@ -98,7 +110,7 @@ class StreamReader
    /**
     * Reads a nested table. Uses the supplied reader class instance.
     *
-    * @param readerClass reader class inatance
+    * @param readerClass reader class instance
     * @return table rows
     */
    public List<MapRow> readTable(Class<? extends TableReader> readerClass) throws IOException
@@ -107,7 +119,7 @@ class StreamReader
 
       try
       {
-         reader = readerClass.getConstructor(InputStream.class).newInstance(m_stream);
+         reader = readerClass.getConstructor(StreamReader.class).newInstance(this);
       }
       catch (Exception ex)
       {
@@ -129,6 +141,27 @@ class StreamReader
       if (DatatypeConverter.getBoolean(m_stream))
       {
          result = readTable(readerClass);
+      }
+      else
+      {
+         result = Collections.emptyList();
+      }
+      return result;
+   }
+
+   /**
+    * Conditionally read an unknown table.
+    * 
+    * @param rowSize Unknown table row size
+    * @param rowMagicNumber Unknown table row magic number
+    * @return table rows or empty list if table not present
+    */
+   public List<MapRow> readUnknownTableConditional(int rowSize, int rowMagicNumber) throws IOException
+   {
+      List<MapRow> result;
+      if (DatatypeConverter.getBoolean(m_stream))
+      {
+         result = readUnknownTable(rowSize, rowMagicNumber);
       }
       else
       {
@@ -238,7 +271,7 @@ class StreamReader
     */
    public List<MapRow> readUnknownBlocks(int size) throws IOException
    {
-      return new UnknownBlockReader(m_stream, size).read();
+      return new UnknownBlockReader(this, size).read();
    }
 
    /**
@@ -253,7 +286,7 @@ class StreamReader
 
       try
       {
-         reader = readerClass.getConstructor(InputStream.class).newInstance(m_stream);
+         reader = readerClass.getConstructor(StreamReader.class).newInstance(this);
       }
       catch (Exception ex)
       {
@@ -263,5 +296,16 @@ class StreamReader
       return reader.read();
    }
 
+   /**
+    * Retrieve the major version number of this file.
+    * 
+    * @return major version number
+    */
+   public int getMajorVersion()
+   {
+      return m_majorVersion;
+   }
+ 
+   private final int m_majorVersion;
    private final InputStream m_stream;
 }

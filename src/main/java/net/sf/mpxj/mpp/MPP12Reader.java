@@ -37,7 +37,6 @@ import org.apache.poi.poifs.filesystem.DocumentEntry;
 import org.apache.poi.poifs.filesystem.DocumentInputStream;
 
 import net.sf.mpxj.AssignmentField;
-import net.sf.mpxj.DateRange;
 import net.sf.mpxj.EventManager;
 import net.sf.mpxj.MPXJException;
 import net.sf.mpxj.ProjectCalendar;
@@ -90,6 +89,7 @@ final class MPP12Reader implements MPPVariantReader
             processConstraintData();
             processAssignmentData();
             postProcessTasks();
+            processDataLinks();
 
             if (reader.getReadPresentationData())
             {
@@ -1220,14 +1220,6 @@ final class MPP12Reader implements MPPVariantReader
          }
 
          //
-         // If this is a split task, allocate space for the split durations
-         //
-         if ((metaData[9] & 0x80) == 0)
-         {
-            task.setSplits(new LinkedList<DateRange>());
-         }
-
-         //
          // Process any enterprise columns
          //
          processTaskEnterpriseColumns(uniqueID, task, taskVarData, metaData2);
@@ -1292,8 +1284,8 @@ final class MPP12Reader implements MPPVariantReader
       // Renumber ID values using a large increment to allow
       // space for later inserts.
       //
-      TreeMap<Integer, Integer> taskMap = new TreeMap<Integer, Integer>();
-      int nextIDIncrement = 1000;
+      TreeMap<Integer, Integer> taskMap = new TreeMap<Integer, Integer>();     
+      int nextIDIncrement = ((m_nullTaskOrder.size() / 1000) + 1) * 1000;
       int nextID = (m_file.getTaskByUniqueID(Integer.valueOf(0)) == null ? nextIDIncrement : 0);
       for (Map.Entry<Long, Integer> entry : m_taskOrder.entrySet())
       {
@@ -2019,7 +2011,21 @@ final class MPP12Reader implements MPPVariantReader
 
       GroupReader reader = new GroupReader12();
       reader.process(m_file, fixedData, varData, m_fontBases);
+   }
 
+   /**
+    * Read data link definitions.
+    */
+   private void processDataLinks()throws IOException
+   {
+      DirectoryEntry dir = (DirectoryEntry) m_viewDir.getEntry("CEdl");
+      FixedMeta fixedMeta = new FixedMeta(new DocumentInputStream(((DocumentEntry) dir.getEntry("FixedMeta"))), 11);
+      FixedData fixedData = new FixedData(fixedMeta, m_inputStreamFactory.getInstance(dir, "FixedData"));
+      VarMeta varMeta = new VarMeta12(new DocumentInputStream(((DocumentEntry) dir.getEntry("VarMeta"))));
+      Var2Data varData = new Var2Data(varMeta, new DocumentInputStream(((DocumentEntry) dir.getEntry("Var2Data"))));
+
+      DataLinkFactory factory = new DataLinkFactory(m_file, fixedData, varData);
+      factory.process();
    }
 
    /**

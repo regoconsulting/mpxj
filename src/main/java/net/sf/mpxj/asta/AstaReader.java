@@ -25,7 +25,6 @@ package net.sf.mpxj.asta;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -324,12 +323,22 @@ final class AstaReader
    {
       for (Row row : rows)
       {
+         boolean rowIsBar = (row.getInteger("BARID") != null);
+
+         //
+         // Don't export hammock tasks.
+         //
+         if (rowIsBar && row.getChildRows().isEmpty())
+         {
+            continue;
+         }
+
          Task task = parent.addTask();
 
          //
          // Do we have a bar, task, or milestone?
          //
-         if (row.getInteger("BARID") != null)
+         if (rowIsBar)
          {
             //
             // If the bar only has one child task, we skip it and add the task directly
@@ -615,13 +624,39 @@ final class AstaReader
     * Processes predecessor data.
     *
     * @param rows predecessor data
+    * @param completedSections completed section data
     */
-   public void processPredecessors(List<Row> rows)
+   public void processPredecessors(List<Row> rows, List<Row> completedSections)
    {
+      Map<Integer, Integer> completedSectionMap = new HashMap<Integer, Integer>();
+      for (Row section : completedSections)
+      {
+         completedSectionMap.put(section.getInteger("TASK_COMPLETED_SECTIONID"), section.getInteger("TASK"));
+      }
+
       for (Row row : rows)
       {
-         Task startTask = m_project.getTaskByUniqueID(row.getInteger("START_TASK"));
-         Task endTask = m_project.getTaskByUniqueID(row.getInteger("END_TASK"));
+         Integer startTaskID = row.getInteger("START_TASK");                 
+         Task startTask = m_project.getTaskByUniqueID(startTaskID);
+         if (startTask == null)
+         {
+            startTaskID = completedSectionMap.get(startTaskID);            
+            if (startTaskID != null)
+            {
+               startTask = m_project.getTaskByUniqueID(startTaskID);
+            }   
+         }
+         
+         Integer endTaskID = row.getInteger("END_TASK");
+         Task endTask = m_project.getTaskByUniqueID(endTaskID);
+         if (endTask == null)
+         {
+            endTaskID = completedSectionMap.get(endTaskID);            
+            if (endTaskID != null)
+            {
+               endTask = m_project.getTaskByUniqueID(endTaskID);
+            }   
+         }
 
          if (startTask != null && endTask != null)
          {
@@ -1239,10 +1274,7 @@ final class AstaReader
 
                if (startTime.getTime() > endTime.getTime())
                {
-                  Calendar cal = Calendar.getInstance();
-                  cal.setTime(endTime);
-                  cal.add(Calendar.DAY_OF_YEAR, 1);
-                  endTime = cal.getTime();
+                  endTime = DateHelper.addDays(endTime, 1);
                }
 
                if (startTime.getTime() < lastEndTime)

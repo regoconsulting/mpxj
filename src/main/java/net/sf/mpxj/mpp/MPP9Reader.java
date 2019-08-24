@@ -38,7 +38,6 @@ import org.apache.poi.poifs.filesystem.DocumentEntry;
 import org.apache.poi.poifs.filesystem.DocumentInputStream;
 
 import net.sf.mpxj.CustomFieldContainer;
-import net.sf.mpxj.DateRange;
 import net.sf.mpxj.Duration;
 import net.sf.mpxj.EventManager;
 import net.sf.mpxj.FieldType;
@@ -96,7 +95,8 @@ final class MPP9Reader implements MPPVariantReader
             processConstraintData();
             processAssignmentData();
             postProcessTasks();
-
+            processDataLinks();
+            
             if (reader.getReadPresentationData())
             {
                processViewPropertyData();
@@ -1283,14 +1283,6 @@ final class MPP9Reader implements MPPVariantReader
          }
 
          //
-         // If this is a split task, allocate space for the split durations
-         //
-         if ((metaData[9] & 0x80) == 0)
-         {
-            task.setSplits(new LinkedList<DateRange>());
-         }
-
-         //
          // Unfortunately it looks like 'null' tasks sometimes make it through,
          // so let's check for to see if we need to mark this task as a null
          // task after all.
@@ -2041,6 +2033,21 @@ final class MPP9Reader implements MPPVariantReader
 
       ViewStateReader reader = new ViewStateReader9();
       reader.process(m_file, varData, fixedData);
+   }
+
+   /**
+    * Read data link definitions.
+    */
+   private void processDataLinks()throws IOException
+   {
+      DirectoryEntry dir = (DirectoryEntry) m_viewDir.getEntry("CEdl");
+      FixedMeta fixedMeta = new FixedMeta(new DocumentInputStream(((DocumentEntry) dir.getEntry("FixedMeta"))), 10);
+      FixedData fixedData = new FixedData(fixedMeta, m_inputStreamFactory.getInstance(dir, "FixedData"));
+      VarMeta varMeta = new VarMeta9(new DocumentInputStream(((DocumentEntry) dir.getEntry("VarMeta"))));
+      Var2Data varData = new Var2Data(varMeta, new DocumentInputStream(((DocumentEntry) dir.getEntry("Var2Data"))));
+
+      DataLinkFactory factory = new DataLinkFactory(m_file, fixedData, varData);
+      factory.process();
    }
 
    /**

@@ -1,9 +1,66 @@
 # Changelog
 
-## 7.7.2 (git master)
+## 7.9.3 (git master)
+
+## 7.9.2 (19/08/2019)
+* Add support for reading and writing secondary constraints from P6 schedules (Based on a contribution by Sruthi-Ganesh)
+* Improve support for Synchro SP files containing blank tasks.
+* Make constraint type mapping consistent when reading and writing PMXML files.
+* Improve handling of leveling delay units and actual duration units (Based in a contribution by Daniel Schmidt).
+* Improve handling of certain types of malformed MPP files.
+* Improve handling of certain types of malformed SDEF files.
+* Map P6 Equipment resource type to cost rather than work (Contributed by forenpm)
+* Improve handling of certain MPP files containing large numbers of blank tasks.
+* Improve handling of certain MPX files containing trailing delimiters.
+
+## 7.9.1 (01/07/2019)
+* Set task start, finish and percent complete when reading SDEF files.
+
+## 7.9.0 (01/07/2019)
+* Add support for reading SDEF files.
+
+## 7.8.4 (27/06/2019)
+* Add support for reading data links (linked fields) configuration from MPP files.
+* Updated to avoid an infinite loop when processing certain corrupt files (Contributed by ninthwaveltd).
+* Update MSPDI generation to ensure MS Project correctly recognises complete tasks without resource assignments.
+* Ensure that activity codes are read for P6 schedules.
+* Improve support for reading custom field values derived from custom field lookup tables in MPP files.
+* Improve support for MPP files written with the June 2019 update of Microsoft Project.
+
+## 7.8.3 (24/05/2019)
+* Improve handling of task baseline start, start, baseline finish, finish and slack fields read from FTS files.
+
+## 7.8.2 (19/05/2019)
+* Improve handling of MPP files with missing Props.
+* Improve handling of custom field lookup tables for MPP12 files.
+* Correctly write activity duration type to a PMXML file (Contributed by Sebastian Stock)
+* Improve handling of Activity Type and Activity ID when writing PMXML files (Based on a contribution by Sebastian Stock)
+* Update PMXML file reader for greater consistency with XER and P6 database readers (Activity ID, Activity Type, Status, and Primary Resource ID)
+* Improve handling of certain FTS files.
+* Improve handling of task notes from MPP8 files.
+* More accurately read predecessors and successors from Asta PP files (Based on a contribution by Dave McKay)
+* When a schedule is read from P6, P3, or SureTrak, Task.getSummary will return true only if a task is part of the WBS
+* Improve support for reading the Synchro Scheduler 2018 SP files.
+* Added Task.hasChildTasks() method.
+* Fixed [Issue 330](https://sourceforge.net/p/mpxj/bugs/330): Splits data coming in as null for all tasks
+
+## 7.8.1 (13/02/2019)
+* Improve support for reading the Synchro Scheduler 2018 SP files.
+* Add support for reading Gantt Designer GNT files.
+* Improve handling of non-standard MSPDI files.
+* Improve handling of non-standard GanttProject files.
+* Update MSPDI generation to ensure MS Project correctly recognises complete milestones without resource assignments.
+* Improve support for reading user defined fields from PMXML files.
+* Ignore hammock tasks when reading PP files.
+
+## 7.8.0 (18/01/2019)
+* Added support for reading and writing GUIDs for Tasks, Resources, and Assignments in MSPDI files.
 * Updated Java build to use Maven
+* Updated to provide a general performance improvement (Based on a contribution by Tiago de Mello)
+* Updated to fix an issue when the Microsoft JDBC driver is used to access a P6 database in SQL Server 2005
 * Fixed [Issue 332](https://sourceforge.net/p/mpxj/bugs/332): Asta lag sign incorrect (Based on a contribution by Dave McKay)
 * Fixed [Issue 333](https://sourceforge.net/p/mpxj/bugs/333): Asta constraints lost (Contributed by Dave McKay)
+* Fixed [Issue 335](https://sourceforge.net/p/mpxj/bugs/335): MSDPI into Asta doesn't import Calendar exceptions (Contributed by Dave McKay)
 
 ## 7.7.1 (23/10/2018)
 * Read additional schedule options from XER files. (Contributed by forenpm)
