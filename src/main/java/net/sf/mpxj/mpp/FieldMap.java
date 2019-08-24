@@ -32,6 +32,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.UUID;
 
 import net.sf.mpxj.AccrueType;
 import net.sf.mpxj.BookingType;
@@ -1270,11 +1271,7 @@ abstract class FieldMap
          // Note that this simplistic approach could produce false positives
          //
          int mask = varData.getShort(id, type);
-         if ((mask & 0xFF00) != VALUE_LIST_MASK)
-         {
-            result = varData.getUnicodeString(id, type);
-         }
-         else
+         if ((mask & 0xFF00) == VALUE_LIST_MASK)
          {
             int uniqueId = varData.getInt(id, 2, type);
             CustomFieldValueItem item = m_customFields.getCustomFieldValueItemByUniqueID(uniqueId);
@@ -1286,6 +1283,25 @@ abstract class FieldMap
                   result = (String) value;
                }
             }
+         }
+         else if ((mask & 0xFF00) == VALUE_LIST_NO_ID_MASK)
+         {
+            long high = varData.getLong(id, 6, type);
+            long low = varData.getLong(id, 14, type);
+            UUID guid = new UUID(high, low);
+            CustomFieldValueItem item = m_customFields.getCustomFieldValueItemByGuid(guid);
+            if(item != null)
+            {
+               Object value = item.getValue();
+               if(value instanceof String)
+               {
+                  result = (String) value;
+               }
+            }
+         }
+         else
+         {
+            result = varData.getUnicodeString(id, type);
          }
          return result;
       }
@@ -1474,6 +1490,7 @@ abstract class FieldMap
    };
 
    private static final int VALUE_LIST_MASK = 0x0700;
+   private static final int VALUE_LIST_NO_ID_MASK = 0x0400;
 
    private static final int MAX_FIXED_DATA_BLOCKS = 2;
 }
