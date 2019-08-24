@@ -1286,9 +1286,7 @@ abstract class FieldMap
          }
          else if ((mask & 0xFF00) == VALUE_LIST_NO_ID_MASK)
          {
-            long high = varData.getLong(id, 6, type);
-            long low = varData.getLong(id, 14, type);
-            UUID guid = new UUID(high, low);
+            UUID guid = MPPUtility.getGUID(varData.getByteArray(id, type), 6);
             CustomFieldValueItem item = m_customFields.getCustomFieldValueItemByGuid(guid);
             if(item != null)
             {
