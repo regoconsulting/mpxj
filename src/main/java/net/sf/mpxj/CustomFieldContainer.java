@@ -89,7 +89,7 @@ public class CustomFieldContainer implements Iterable<CustomField>
    {
       return m_guidMap.get(guid);
    }
-
+   
    /**
     * Add a value to the custom field value index.
     *
@@ -98,9 +98,10 @@ public class CustomFieldContainer implements Iterable<CustomField>
    public void registerValue(CustomFieldValueItem item)
    {
       m_valueMap.put(item.getUniqueID(), item);
-      UUID guid = item.getGuid();
-      if(guid != null)
-         m_guidMap.put(guid, item);
+      if (item.getGuid() != null)
+      {
+         m_guidMap.put(item.getGuid(), item);
+      }
    }
 
    /**
@@ -111,9 +112,10 @@ public class CustomFieldContainer implements Iterable<CustomField>
    public void deregisterValue(CustomFieldValueItem item)
    {
       m_valueMap.remove(item.getUniqueID());
-      UUID guid = item.getGuid();
-      if(guid != null)
-         m_guidMap.remove(guid);
+      if (item.getGuid() != null)
+      {
+         m_guidMap.remove(item.getGuid());
+      }
    }
 
    /**

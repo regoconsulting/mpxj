@@ -1,6 +1,18 @@
 # Changelog
 
-## 7.9.3 (git master)
+## 7.9.4 (git master)
+* Ensure attribute names are valid when exporting JSON.
+* Improve handling of custom field lookup values (Based on a contribution by Nick Darlington).
+* Fix an issue when copying a calendar which has exceptions defined.
+
+## 7.9.3 (10/09/2019)
+* Add support for reading task early finish and late finish attributes from Asta PP files.
+* Ensure XER files containing secondary constraints can be read correctly.
+* Preserve calendar IDs when reading from XER files and P6 database (Based on a contribution by forenpm).
+* Ensure base calendars are read correctly for P6 schedules.
+* Ensure MPP files with unexpected auto filter definition data are handled gracefully.
+* Preserve leveling delay format when reading tasks from MSPDI files.
+* Ensure unexpected structure of timephased data is handled gracefully when reading MPP files.
 
 ## 7.9.2 (19/08/2019)
 * Add support for reading and writing secondary constraints from P6 schedules (Based on a contribution by Sruthi-Ganesh)
